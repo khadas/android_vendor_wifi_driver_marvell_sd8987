@@ -3,7 +3,7 @@
  *  @brief This file contains USB specific code
  *
  *
- *  Copyright 2014-2020 NXP
+ *  Copyright 2008-2021 NXP
  *
  *  This software file (the File) is distributed by NXP
  *  under the terms of the GNU General Public License Version 2, June 1991
@@ -99,7 +99,8 @@ static const struct _mlan_card_info mlan_card_info_usb9097 = {
  *  @param rev_id         A pointer to chip revision id
  *  @return        MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
-mlan_status wlan_usb_check_revision(mlan_adapter *pmadapter, t_u32 *rev_id)
+static mlan_status wlan_usb_check_revision(mlan_adapter *pmadapter,
+					   t_u32 *rev_id)
 {
 	mlan_status ret = MLAN_STATUS_SUCCESS;
 	pmlan_callbacks pcb = &pmadapter->callbacks;
@@ -771,7 +772,8 @@ mlan_status wlan_get_usb_device(pmlan_adapter pmadapter)
  *
  *  @return		MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
-mlan_status wlan_usb_dnld_fw(pmlan_adapter pmadapter, pmlan_fw_image pmfw)
+static mlan_status wlan_usb_dnld_fw(pmlan_adapter pmadapter,
+				    pmlan_fw_image pmfw)
 {
 	mlan_status ret = MLAN_STATUS_SUCCESS;
 
@@ -890,8 +892,8 @@ mlan_status wlan_usb_deaggr_rx_pkt(pmlan_adapter pmadapter, pmlan_buffer pmbuf)
  *
  *  @return             MTRUE/MFALSE
  */
-t_u8 wlan_is_port_tx_paused(pmlan_adapter pmadapter,
-			    usb_tx_aggr_params *pusb_tx_aggr)
+static t_u8 wlan_is_port_tx_paused(pmlan_adapter pmadapter,
+				   usb_tx_aggr_params *pusb_tx_aggr)
 {
 	mlan_private *pmpriv = MNULL;
 	t_u8 i;
@@ -1097,7 +1099,8 @@ mlan_status wlan_usb_host_to_card_aggr(pmlan_adapter pmadapter,
  *
  *  @return			MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
-mlan_status wlan_pm_usb_wakeup_card(pmlan_adapter pmadapter, t_u8 timeout)
+static mlan_status wlan_pm_usb_wakeup_card(pmlan_adapter pmadapter,
+					   t_u8 timeout)
 {
 	mlan_status ret = MLAN_STATUS_SUCCESS;
 	t_u32 age_ts_usec;
@@ -1135,8 +1138,9 @@ mlan_status wlan_pm_usb_wakeup_card(pmlan_adapter pmadapter, t_u8 timeout)
  *
  *  @return          MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
-mlan_status wlan_usb_host_to_card(pmlan_private pmpriv, t_u8 type,
-				  mlan_buffer *pmbuf, mlan_tx_param *tx_param)
+static mlan_status wlan_usb_host_to_card(pmlan_private pmpriv, t_u8 type,
+					 mlan_buffer *pmbuf,
+					 mlan_tx_param *tx_param)
 {
 	mlan_status ret = MLAN_STATUS_SUCCESS;
 	usb_tx_aggr_params *pusb_tx_aggr = MNULL;
@@ -1200,8 +1204,9 @@ mlan_status wlan_usb_host_to_card(pmlan_private pmpriv, t_u8 type,
  *  @param pmbuf     A pointer to the mlan_buffer
  *  @return          N/A
  */
-mlan_status wlan_usb_cmdevt_complete(pmlan_adapter pmadapter,
-				     mlan_buffer *pmbuf, mlan_status status)
+static mlan_status wlan_usb_cmdevt_complete(pmlan_adapter pmadapter,
+					    mlan_buffer *pmbuf,
+					    mlan_status status)
 {
 	ENTER();
 
@@ -1219,8 +1224,9 @@ mlan_status wlan_usb_cmdevt_complete(pmlan_adapter pmadapter,
  *  @param pmbuf     A pointer to the mlan_buffer
  *  @return          N/A
  */
-mlan_status wlan_usb_data_complete(pmlan_adapter pmadapter, mlan_buffer *pmbuf,
-				   mlan_status status)
+static mlan_status wlan_usb_data_complete(pmlan_adapter pmadapter,
+					  mlan_buffer *pmbuf,
+					  mlan_status status)
 {
 	ENTER();
 
@@ -1238,8 +1244,8 @@ mlan_status wlan_usb_data_complete(pmlan_adapter pmadapter, mlan_buffer *pmbuf,
  *  @param pmbuf     A pointer to the mlan_buffer
  *  @return
  */
-mlan_status wlan_usb_handle_rx_packet(mlan_adapter *pmadapter,
-				      pmlan_buffer pmbuf)
+static mlan_status wlan_usb_handle_rx_packet(mlan_adapter *pmadapter,
+					     pmlan_buffer pmbuf)
 {
 	ENTER();
 

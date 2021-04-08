@@ -1,6 +1,6 @@
 #  File: Makefile
 #
-#  Copyright 2014-2020 NXP
+#  Copyright 2008-2021 NXP
 #
 #  This software file (the File) is distributed by NXP
 #  under the terms of the GNU General Public License Version 2, June 1991
@@ -16,9 +16,15 @@
 #  this warranty disclaimer.
 #
 
+CONFIG_COMPATDIR=n
+ifeq ($(CONFIG_COMPATDIR), y)
 COMPATDIR=/lib/modules/$(KERNELVERSION_X86)/build/compat-wireless-3.2-rc1-1/include
 CC =		$(CROSS_COMPILE)gcc -I$(COMPATDIR)
-LD=		$(CROSS_COMPILE)ld
+else
+CC =		$(CROSS_COMPILE)gcc
+endif
+
+LD ?=		$(CROSS_COMPILE)ld
 BACKUP=		/root/backup
 YMD=		`date +%Y%m%d%H%M`
 
@@ -109,14 +115,19 @@ CONFIG_USERSPACE_32BIT_OVER_KERNEL_64BIT=n
 #############################################################################
 
 MODEXT = ko
-ccflags-y += -Wno-unknown-warning-option -Wno-typedef-redefinition -Wno-pointer-bool-conversion -Wno-self-assign -Wno-parentheses-equality
-ccflags-y += -I$(M)/mlan
+ccflags-y += -I$(PWD)/mlan
 ccflags-y += -DLINUX
 
 
 
 
-KERNELDIR ?= $(KERNEL_SRC)
+
+ARCH ?= arm64
+CONFIG_IMX_SUPPORT=y
+ifeq ($(CONFIG_IMX_SUPPORT),y)
+ccflags-y += -DIMX_SUPPORT
+endif
+KERNELDIR ?= /usr/src/arm/androidQ_kernel/kernel_imx_5_4_47
 CROSS_COMPILE ?= /usr/local/arm/androidQ_toolchain/aarch64-linux-android-4.9/bin/aarch64-linux-android-
 
 LD += -S
@@ -305,10 +316,12 @@ WimpGCC_VERSION := $(shell echo `gcc -dumpversion | cut -f1 -d.`| bc )
 ifeq ($(shell test $(WimpGCC_VERSION) -ge 7; echo $$?),0)
 ccflags-y += -Wimplicit-fallthrough=3
 endif
-ccflags-y += -Wno-stringop-overflow
-ccflags-y += -Wno-tautological-compare
-ccflags-y += -Wno-stringop-truncation
-
+#ccflags-y += -Wunused-but-set-variable
+#ccflags-y += -Wmissing-prototypes
+#ccflags-y += -Wold-style-definition
+#ccflags-y += -Wtype-limits
+#ccflags-y += -Wsuggest-attribute=format
+#ccflags-y += -Wmissing-include-dirs
 #############################################################################
 # Make Targets
 #############################################################################
@@ -528,15 +541,7 @@ moal-objs := $(MOALOBJS)
 else
 
 default:
-	$(MAKE) -C $(KERNELDIR) M=$(M) ARCH=arm64 CROSS_COMPILE=$(CROSS_COMPILE) modules
-	$(CROSS_COMPILE)strip --strip-unneeded ${OUT_DIR}/$(M)/mlan.ko
-	$(CROSS_COMPILE)strip --strip-unneeded ${OUT_DIR}/$(M)/moal.ko
-
-modules_install:
-	$(MAKE) INSTALL_MOD_STRIP=1 M=$(M) -C $(KERNELDIR) modules_install
-	mkdir -p ${OUT_DIR}/../vendor_lib/modules
-	cd ${OUT_DIR}/$(M)/; find -name mlan.ko -exec cp {} ${OUT_DIR}/../vendor_lib/modules/mlan.ko \;
-	cd ${OUT_DIR}/$(M)/; find -name moal.ko -exec cp {} ${OUT_DIR}/../vendor_lib/modules/moal.ko \;
+	$(MAKE) -C $(KERNELDIR) M=$(PWD) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules
 
 endif
 

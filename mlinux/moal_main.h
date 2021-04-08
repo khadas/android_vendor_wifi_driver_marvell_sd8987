@@ -3,7 +3,7 @@
  * @brief This file contains wlan driver specific defines etc.
  *
  *
- * Copyright 2014-2020 NXP
+ * Copyright 2008-2021 NXP
  *
  * This software file (the File) is distributed by NXP
  * under the terms of the GNU General Public License Version 2, June 1991
@@ -104,13 +104,11 @@ Change log:
 
 #include <linux/firmware.h>
 
-#ifdef ANDROID_KERNEL
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
 #include <linux/pm_wakeup.h>
 #include <linux/device.h>
 #else
 #include <linux/wakelock.h>
-#endif
 #endif
 
 #include "mlan.h"
@@ -204,18 +202,23 @@ Change log:
 /**
  * interface name
  */
-#define default_mlan_name    "wlan%%d"
-#define default_uap_name    "ap%%d"
-#define default_wfd_name    "p2p%%d"
+#define default_mlan_name "mlan%d"
+#define default_uap_name "uap%d"
+#define default_wfd_name "wfd%d"
 #define default_nan_name "nan%d"
 #define default_mpl_name "mpl%d"
 #define default_11p_name "ocb%d"
 #define mwiphy_name "mwiphy%d"
 
+/** country txpower mode */
+#define CNTRY_TXPOWER_MODE 1
+/** country rgpower mode */
+#define CNTRY_RGPOWER_MODE 2
+
 /** Define BOOLEAN */
 typedef t_u8 BOOLEAN;
 
-#define INTF_CARDTYPE "---------%s-MXM"
+#define INTF_CARDTYPE "---------%s-MM"
 
 #define KERN_VERSION "5X"
 
@@ -243,6 +246,47 @@ typedef t_u8 BOOLEAN;
 /** Driver version */
 extern char driver_version[];
 
+extern struct semaphore AddRemoveCardSem;
+extern int wifi_status;
+extern int max_tx_buf;
+extern int pcie_int_mode;
+
+#ifdef STA_SUPPORT
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 29)
+extern const struct net_device_ops woal_netdev_ops;
+#endif
+#endif
+
+#ifdef UAP_SUPPORT
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 29)
+extern const struct net_device_ops woal_uap_netdev_ops;
+#endif
+#endif
+
+/** Global veriable for usb independent reset */
+extern int fw_reload;
+
+#ifdef MFG_CMD_SUPPORT
+/** Mfg mode */
+extern int mfg_mode;
+#endif
+
+#if defined(STA_CFG80211) || defined(UAP_CFG80211)
+#if CFG80211_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)
+extern int fw_region;
+#endif
+#endif
+
+#if defined(USB)
+extern int skip_fwdnld;
+#endif
+#if defined(SDIO) || defined(PCIE)
+typedef enum {
+	RDWR_STATUS_SUCCESS = 0,
+	RDWR_STATUS_FAILURE = 1,
+	RDWR_STATUS_DONE = 2
+} rdwr_status;
+#endif
 /** Private structure for MOAL */
 typedef struct _moal_private moal_private, *pmoal_private;
 /** Handle data structure for MOAL  */
@@ -636,18 +680,25 @@ out:
 /* IOCTL Timeout */
 #define MOAL_IOCTL_TIMEOUT (20 * HZ)
 
-#ifdef ANDROID_KERNEL
 /** Wake lock timeout in msec */
 #define WAKE_LOCK_TIMEOUT 3000
 /** Roaming Wake lock timeout in msec */
 #define ROAMING_WAKE_LOCK_TIMEOUT 10000
-#endif
 
 /** Threshold value of number of times the Tx timeout happened */
 /* WAR For EDMAC Test */
 #define NUM_TX_TIMEOUT_THRESHOLD 10
 /** Custom event : DRIVER HANG */
 #define CUS_EVT_DRIVER_HANG "EVENT=DRIVER_HANG"
+
+/** TDLS connected event */
+#define CUS_EVT_TDLS_CONNECTED "EVENT=TDLS_CONNECTED"
+/** TDLS tear down event */
+#define CUS_EVT_TDLS_TEARDOWN "EVENT=TDLS_TEARDOWN"
+/** wmm info */
+#define WMM_TYPE_INFO 0
+/** wmm parameter */
+#define WMM_TYPE_PARAMETER 1
 
 /** AP connected event */
 #define CUS_EVT_AP_CONNECTED "EVENT=AP_CONNECTED"
@@ -692,6 +743,8 @@ out:
 
 /** Custom event : Deep Sleep awake */
 #define CUS_EVT_DEEP_SLEEP_AWAKE "EVENT=DS_AWAKE"
+
+#define CUS_EVT_TOD_TOA "EVENT=TOD-TOA"
 
 /** Custom event : Host Sleep activated */
 #define CUS_EVT_HS_ACTIVATED "HS_ACTIVATED"
@@ -776,7 +829,7 @@ typedef enum {
 #define LOW_RX_PENDING 80
 
 /** MAX Tx Pending count */
-#define MAX_TX_PENDING 400
+#define MAX_TX_PENDING 800
 
 /** LOW Tx Pending count */
 #define LOW_TX_PENDING 380
@@ -908,6 +961,8 @@ typedef struct _moal_drv_mode {
 	char *fw_name;
 } moal_drv_mode;
 
+extern moal_handle *m_handle[MAX_MLAN_ADAPTER];
+
 /** Indicate if handle->info's address */
 #define INFO_ADDR BIT(0)
 #define IS_INFO_ADDR(attr) (attr & INFO_ADDR)
@@ -990,6 +1045,7 @@ struct tx_status_info {
 /** woal event type */
 enum woal_event_type {
 	WOAL_EVENT_CHAN_SWITCH,
+	WOAL_EVENT_RX_MGMT_PKT,
 	WOAL_EVENT_BGSCAN_STOP,
 #if defined(UAP_CFG80211) || defined(STA_CFG80211)
 #if CFG80211_VERSION_CODE >= KERNEL_VERSION(3, 8, 0)
@@ -998,6 +1054,13 @@ enum woal_event_type {
 #endif
 #endif
 };
+
+typedef struct _woal_evt_buf {
+	/** Event len */
+	t_u16 event_len;
+	/** Event buffer */
+	t_u8 event_buf[1024];
+} woal_evt_buf;
 
 /** woal event */
 struct woal_event {
@@ -1009,6 +1072,7 @@ struct woal_event {
 	void *priv;
 	union {
 		chan_band_info chan_info;
+		woal_evt_buf evt;
 		mlan_ds_misc_assoc_rsp assoc_resp;
 		int reason_code;
 	};
@@ -1059,11 +1123,51 @@ struct pmksa_entry {
 	u8 pmkid[PMKID_LEN];
 };
 
+/** default rssi low threshold */
+#define TDLS_RSSI_LOW_THRESHOLD 55
+/** default rssi high threshold */
+#define TDLS_RSSI_HIGH_THRESHOLD 50
+/** TDLS idle time */
+#define TDLS_IDLE_TIME (10 * HZ)
+/** TDLS max failure count */
+#define TDLS_MAX_FAILURE_COUNT 4
+/** TDLS tear down reason */
+#define TDLS_TEARN_DOWN_REASON_UNSPECIFIC 26
+
+/** TDLS status */
+typedef enum _tdlsStatus_e {
+	TDLS_NOT_SETUP = 0,
+	TDLS_SETUP_INPROGRESS,
+	TDLS_SETUP_COMPLETE,
+	TDLS_SETUP_FAILURE,
+	TDLS_TEAR_DOWN,
+	TDLS_SWITCHING_CHANNEL,
+	TDLS_IN_BASE_CHANNEL,
+	TDLS_IN_OFF_CHANNEL,
+} tdlsStatus_e;
+
+/** tdls peer_info */
+struct tdls_peer {
+	struct list_head link;
+	/** MAC address information */
+	t_u8 peer_addr[ETH_ALEN];
+	/** rssi */
+	int rssi;
+	/** jiffies with rssi */
+	long rssi_jiffies;
+	/** link status */
+	tdlsStatus_e link_status;
+	/** num of set up failure */
+	t_u8 num_failure;
+};
+
 struct rf_test_mode_data {
 	/* tx antenna num */
 	t_u32 tx_antenna;
 	/* rx antenna num */
 	t_u32 rx_antenna;
+	/* radio mode */
+	t_u32 radio_mode[2];
 	/* RF band */
 	t_u32 band;
 	/* RF bandwidth */
@@ -1081,7 +1185,9 @@ struct rf_test_mode_data {
 	/* Tx continuous config values */
 	t_u32 tx_cont_data[6];
 	/* Tx frame config values */
-	t_u32 tx_frame_data[13];
+	t_u32 tx_frame_data[20];
+	/* HE TB Tx values */
+	t_u32 he_tb_tx[5];
 	/* BSSID */
 	t_u8 bssid[ETH_ALEN];
 };
@@ -1215,6 +1321,8 @@ struct _moal_private {
 	t_u8 conn_wep_key[MAX_WEP_KEY_SIZE];
 	/** connection param */
 	struct cfg80211_connect_params sme_current;
+	/* associcate bss */
+	struct cfg80211_bss *assoc_bss;
 #endif
 	t_u8 wait_target_ap_pmkid;
 	wait_queue_head_t okc_wait_q __ATTRIB_ALIGN__;
@@ -1389,6 +1497,14 @@ struct _moal_private {
 	t_u8 enable_tcp_ack_enh;
 	/** TCP session spin lock */
 	spinlock_t tcp_sess_lock;
+	/** tcp list */
+	struct list_head tdls_list;
+	/** tdls spin lock */
+	spinlock_t tdls_lock;
+	/** auto tdls  flag */
+	t_u8 enable_auto_tdls;
+	/** check tx packet for tdls peer */
+	t_u8 tdls_check_tx;
 #if CFG80211_VERSION_CODE > KERNEL_VERSION(2, 6, 29)
 	atomic_t wmm_tx_pending[4];
 #endif
@@ -1526,7 +1642,6 @@ enum ext_mod_params {
 	EXT_SHUTDOWN_HS,
 #endif
 #endif
-	EXT_CNTRY_TXPWR,
 #if defined(USB)
 	EXT_SKIP_FWDNLD,
 #endif
@@ -1554,6 +1669,7 @@ enum ext_mod_params {
 #endif
 #endif
 	EXT_TX_WORK,
+	EXT_RPS,
 	EXT_MAX_PARAM,
 };
 
@@ -1604,6 +1720,7 @@ typedef struct _moal_mod_para {
 	char *init_cfg;
 	char *cal_data_cfg;
 	char *txpwrlimit_cfg;
+	int cntry_txpwr;
 	char *init_hostcmd_cfg;
 	char *band_steer_cfg;
 	int cfg80211_wext;
@@ -1616,15 +1733,12 @@ typedef struct _moal_mod_para {
 #ifdef PCIE
 	int pcie_int_mode;
 #endif /* PCIE */
-#ifdef ANDROID_KERNEL
 	int wakelock_timeout;
-#endif
 	unsigned int dev_cap_mask;
 #if defined(SD8997) || defined(PCIE8997) || defined(USB8997) ||                \
 	defined(SD8977) || defined(SD8987) || defined(SD9098) ||               \
 	defined(USB9098) || defined(PCIE9098) || defined(SD9097) ||            \
-	defined(USB9097) || defined(PCIE9097) || defined(SD8978) ||            \
-	defined(USB8978)
+	defined(USB9097) || defined(PCIE9097) || defined(SD8978)
 	int pmic;
 #endif
 	int antcfg;
@@ -1650,6 +1764,10 @@ void woal_set_tp_state(moal_private *priv);
 #define RX_DROP_P3 (MAX_TP_ACCOUNT_DROP_POINT_NUM + 2)
 #define RX_DROP_P4 (MAX_TP_ACCOUNT_DROP_POINT_NUM + 3)
 #define RX_DROP_P5 (MAX_TP_ACCOUNT_DROP_POINT_NUM + 4)
+#define TXRX_MAX_SAMPLE 100
+#define RX_TIME_PKT (MAX_TP_ACCOUNT_DROP_POINT_NUM + 5)
+#define TX_TIME_PKT (MAX_TP_ACCOUNT_DROP_POINT_NUM + 6)
+
 typedef struct _moal_tp_acnt_t {
 	/* TX accounting */
 	unsigned long tx_packets[MAX_TP_ACCOUNT_DROP_POINT_NUM];
@@ -1658,10 +1776,19 @@ typedef struct _moal_tp_acnt_t {
 	unsigned long tx_bytes[MAX_TP_ACCOUNT_DROP_POINT_NUM];
 	unsigned long tx_bytes_last[MAX_TP_ACCOUNT_DROP_POINT_NUM];
 	unsigned long tx_bytes_rate[MAX_TP_ACCOUNT_DROP_POINT_NUM];
+	unsigned long tx_amsdu_cnt;
+	unsigned long tx_amsdu_cnt_last;
+	unsigned long tx_amsdu_cnt_rate;
+	unsigned long tx_amsdu_pkt_cnt;
+	unsigned long tx_amsdu_pkt_cnt_last;
+	unsigned long tx_amsdu_pkt_cnt_rate;
 	unsigned long tx_intr_cnt;
 	unsigned long tx_intr_last;
 	unsigned long tx_intr_rate;
 	unsigned long tx_pending;
+	unsigned long tx_xmit_skb_realloc_cnt;
+	unsigned long tx_delay_driver[TXRX_MAX_SAMPLE];
+
 	/** RX accounting */
 	unsigned long rx_packets[MAX_TP_ACCOUNT_DROP_POINT_NUM];
 	unsigned long rx_packets_last[MAX_TP_ACCOUNT_DROP_POINT_NUM];
@@ -1669,11 +1796,23 @@ typedef struct _moal_tp_acnt_t {
 	unsigned long rx_bytes[MAX_TP_ACCOUNT_DROP_POINT_NUM];
 	unsigned long rx_bytes_last[MAX_TP_ACCOUNT_DROP_POINT_NUM];
 	unsigned long rx_bytes_rate[MAX_TP_ACCOUNT_DROP_POINT_NUM];
+	unsigned long rx_amsdu_cnt;
+	unsigned long rx_amsdu_cnt_last;
+	unsigned long rx_amsdu_cnt_rate;
+	unsigned long rx_amsdu_pkt_cnt;
+	unsigned long rx_amsdu_pkt_cnt_last;
+	unsigned long rx_amsdu_pkt_cnt_rate;
 	unsigned long rx_intr_cnt;
 	unsigned long rx_intr_last;
 	unsigned long rx_intr_rate;
 	unsigned long rx_pending;
 	unsigned long rx_paused_cnt;
+	unsigned long rx_rdptr_full_cnt;
+	unsigned long rx_delay1_driver[TXRX_MAX_SAMPLE];
+	unsigned long rx_delay2_driver[TXRX_MAX_SAMPLE];
+	unsigned long rx_delay_kernel[TXRX_MAX_SAMPLE];
+	t_u8 rx_index;
+	t_u8 tx_index;
 	/* TP account mode 0-disable 1-enable */
 	unsigned int on;
 	/* drop point */
@@ -1987,12 +2126,10 @@ struct _moal_handle {
 	/** Card specific driver version */
 	t_s8 driver_version[MLAN_MAX_VER_STR_LEN];
 	char *fwdump_fname;
-#ifdef ANDROID_KERNEL
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
 	struct wakeup_source ws;
 #else
 	struct wake_lock wake_lock;
-#endif
 #endif
 	t_u16 dfs_repeater_mode;
 	/* feature_control */
@@ -2644,7 +2781,6 @@ void woal_free_moal_handle(moal_handle *handle);
 /** shutdown fw */
 mlan_status woal_shutdown_fw(moal_private *priv, t_u8 wait_option);
 /* Functions in interface module */
-#ifdef ANDROID_KERNEL
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
 static inline void wakeup_source_init(struct wakeup_source *ws,
 				      const char *name)
@@ -2673,7 +2809,6 @@ static inline void wakeup_source_trash(struct wakeup_source *ws)
 
 	LEAVE();
 }
-#endif
 #endif
 /** Add card */
 moal_handle *woal_add_card(void *card, struct device *dev, moal_if_ops *if_ops,
@@ -2935,6 +3070,8 @@ int woal_priv_get_nonglobal_operclass_by_bw_channel(moal_private *priv,
 int woal_send_host_packet(struct net_device *dev, struct ifreq *req);
 /** Private command ID to pass mgmt frame */
 #define WOAL_MGMT_FRAME_TX_IOCTL (SIOCDEVPRIVATE + 12)
+/** common ioctl for TDLS */
+int woal_tdls_config_ioctl(struct net_device *dev, struct ifreq *req);
 
 int woal_get_bss_type(struct net_device *dev, struct ifreq *req);
 #if defined(STA_WEXT) || defined(UAP_WEXT)
@@ -3020,6 +3157,8 @@ mlan_status woal_init_sta_dev(struct net_device *dev, moal_private *priv);
 mlan_status woal_init_uap_dev(struct net_device *dev, moal_private *priv);
 #endif
 mlan_status woal_update_drv_tbl(moal_handle *handle, int drv_mode_local);
+void woal_fill_mlan_buffer(moal_private *priv, mlan_buffer *pmbuf,
+			   struct sk_buff *skb);
 moal_private *woal_add_interface(moal_handle *handle, t_u8 bss_num,
 				 t_u8 bss_type);
 void woal_remove_interface(moal_handle *handle, t_u8 bss_index);
@@ -3081,6 +3220,9 @@ void woal_clear_conn_params(moal_private *priv);
 #endif
 
 void woal_flush_tcp_sess_queue(moal_private *priv);
+#ifdef STA_CFG80211
+void woal_flush_tdls_list(moal_private *priv);
+#endif
 void wlan_scan_create_brief_table_entry(t_u8 **ppbuffer,
 					BSSDescriptor_t *pbss_desc);
 int wlan_get_scan_table_ret_entry(BSSDescriptor_t *pbss_desc, t_u8 **ppbuffer,

@@ -3,7 +3,7 @@
  * @brief This file contains functions for debug proc file.
  *
  *
- * Copyright 2014-2020 NXP
+ * Copyright 2008-2021 NXP
  *
  * This software file (the File) is distributed by NXP
  * under the terms of the GNU General Public License Version 2, June 1991
@@ -184,6 +184,8 @@ static struct debug_data items[] = {
 	 item_addr(num_cons_assoc_failure), INFO_ADDR},
 	{"cmd_sent", item_size(cmd_sent), item_addr(cmd_sent), INFO_ADDR},
 	{"data_sent", item_size(data_sent), item_addr(data_sent), INFO_ADDR},
+	{"data_sent_cnt", item_size(data_sent_cnt), item_addr(data_sent_cnt),
+	 INFO_ADDR},
 	{"mp_rd_bitmap", item_size(mp_rd_bitmap), item_addr(mp_rd_bitmap),
 	 INFO_ADDR},
 	{"curr_rd_port", item_size(curr_rd_port), item_addr(curr_rd_port),
@@ -363,6 +365,8 @@ static struct debug_data uap_items[] = {
 #endif
 	{"cmd_sent", item_size(cmd_sent), item_addr(cmd_sent), INFO_ADDR},
 	{"data_sent", item_size(data_sent), item_addr(data_sent), INFO_ADDR},
+	{"data_sent_cnt", item_size(data_sent_cnt), item_addr(data_sent_cnt),
+	 INFO_ADDR},
 	{"mp_rd_bitmap", item_size(mp_rd_bitmap), item_addr(mp_rd_bitmap),
 	 INFO_ADDR},
 	{"curr_rd_port", item_size(curr_rd_port), item_addr(curr_rd_port),
@@ -1061,14 +1065,15 @@ static int woal_debug_read(struct seq_file *sfp, void *data)
 #endif
 #ifdef PCIE
 	if (IS_PCIE(priv->phandle->card_type)) {
+		seq_printf(sfp, "txbd_rdptr=0x%x txbd_wrptr=0x%x\n",
+			   info->txbd_rdptr, info->txbd_wrptr);
+		seq_printf(sfp, "rxbd_rdptr=0x%x rxbd_wrptr=0x%x\n",
+			   info->rxbd_rdptr, info->rxbd_wrptr);
+		seq_printf(sfp, "eventbd_rdptr=0x%x event_wrptr=0x%x\n",
+			   info->eventbd_rdptr, info->eventbd_wrptr);
 		seq_printf(sfp, "last_wr_index:%d\n",
-			   info->txbd_wrptr & (MLAN_MAX_TXRX_BD - 1));
-		seq_printf(sfp, "Tx pkt size:\n");
-		for (i = 0; i < MLAN_MAX_TXRX_BD; i++) {
-			seq_printf(sfp, "%04d ", info->last_tx_pkt_size[i]);
-			if ((i + 1) % 16 == 0)
-				seq_printf(sfp, "\n");
-		}
+			   info->txbd_wrptr & (info->txrx_bd_size - 1));
+		seq_printf(sfp, "TxRx BD size:%d\n", info->txrx_bd_size);
 	}
 #endif
 	seq_printf(sfp, "tcp_ack_drop_cnt=%d\n", priv->tcp_ack_drop_cnt);
@@ -1128,6 +1133,34 @@ static int woal_debug_read(struct seq_file *sfp, void *data)
 			info->ralist[i].tx_pause);
 	}
 
+	for (i = 0; i < info->tdls_peer_num; i++) {
+		unsigned int j;
+		seq_printf(
+			sfp,
+			"tdls peer: %02x:%02x:%02x:%02x:%02x:%02x snr=%d nf=%d\n",
+			info->tdls_peer_list[i].mac_addr[0],
+			info->tdls_peer_list[i].mac_addr[1],
+			info->tdls_peer_list[i].mac_addr[2],
+			info->tdls_peer_list[i].mac_addr[3],
+			info->tdls_peer_list[i].mac_addr[4],
+			info->tdls_peer_list[i].mac_addr[5],
+			info->tdls_peer_list[i].snr,
+			-info->tdls_peer_list[i].nf);
+		seq_printf(sfp, "htcap: ");
+		for (j = 0; j < sizeof(IEEEtypes_HTCap_t); j++)
+			seq_printf(sfp, "%02x ",
+				   info->tdls_peer_list[i].ht_cap[j]);
+		seq_printf(sfp, "\nExtcap: ");
+		for (j = 0; j < sizeof(IEEEtypes_ExtCap_t); j++)
+			seq_printf(sfp, "%02x ",
+				   info->tdls_peer_list[i].ext_cap[j]);
+		seq_printf(sfp, "\n");
+		seq_printf(sfp, "vhtcap: ");
+		for (j = 0; j < sizeof(IEEEtypes_VHTCap_t); j++)
+			seq_printf(sfp, "%02x ",
+				   info->tdls_peer_list[i].vht_cap[j]);
+		seq_printf(sfp, "\n");
+	}
 exit:
 	MODULE_PUT;
 	LEAVE();

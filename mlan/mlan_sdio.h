@@ -4,7 +4,7 @@
  * driver.
  *
  *
- *  Copyright 2014-2020 NXP
+ *  Copyright 2008-2021 NXP
  *
  *  This software file (the File) is distributed by NXP
  *  under the terms of the GNU General Public License Version 2, June 1991
@@ -527,6 +527,8 @@ static const struct _mlan_card_info mlan_card_info_sd8987 = {
 };
 #endif
 #endif
+
+extern mlan_adapter_operations mlan_sdio_ops;
 
 /** Probe and initialization function */
 mlan_status wlan_sdio_probe(pmlan_adapter pmadapter);

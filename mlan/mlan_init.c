@@ -4,7 +4,7 @@
  *  and HW.
  *
  *
- *  Copyright 2014-2020 NXP
+ *  Copyright 2008-2021 NXP
  *
  *  This software file (the File) is distributed by NXP
  *  under the terms of the GNU General Public License Version 2, June 1991
@@ -53,7 +53,7 @@ Change log:
 /********************************************************
 			Global Variables
 ********************************************************/
-extern pmlan_operations mlan_ops[];
+
 /*******************************************************
 			Local Functions
 ********************************************************/
@@ -521,12 +521,21 @@ mlan_status wlan_init_priv(pmlan_private priv)
 	priv->wmm_required = MTRUE;
 	priv->wmm_enabled = MFALSE;
 	priv->wmm_qosinfo = 0;
+	priv->saved_wmm_qosinfo = 0;
+	priv->host_tdls_cs_support = MTRUE;
+	priv->host_tdls_uapsd_support = MTRUE;
+	priv->tdls_cs_channel = 0;
+	priv->supp_regulatory_class_len = 0;
+	priv->chan_supp_len = 0;
+	priv->tdls_idle_time = TDLS_IDLE_TIMEOUT;
+	priv->txaggrctrl = MTRUE;
 #ifdef STA_SUPPORT
 	priv->pcurr_bcn_buf = MNULL;
 	priv->curr_bcn_size = 0;
 	memset(pmadapter, &priv->ext_cap, 0, sizeof(priv->ext_cap));
 
 	SET_EXTCAP_OPERMODENTF(priv->ext_cap);
+	SET_EXTCAP_TDLS(priv->ext_cap);
 	SET_EXTCAP_QOS_MAP(priv->ext_cap);
 	/* Save default Extended Capability */
 	memcpy_ext(priv->adapter, &priv->def_ext_cap, &priv->ext_cap,
@@ -807,6 +816,7 @@ t_void wlan_init_adapter(pmlan_adapter pmadapter)
 	pmadapter->coex_rx_winsize = 1;
 #ifdef STA_SUPPORT
 	pmadapter->chan_bandwidth = 0;
+	pmadapter->tdls_status = TDLS_NOT_SETUP;
 #endif /* STA_SUPPORT */
 
 	pmadapter->min_ba_threshold = MIN_BA_THRESHOLD;
@@ -847,6 +857,8 @@ t_void wlan_init_adapter(pmlan_adapter pmadapter)
 	       sizeof(pmadapter->sleep_params));
 	memset(pmadapter, &pmadapter->sleep_period, 0,
 	       sizeof(pmadapter->sleep_period));
+	memset(pmadapter, &pmadapter->saved_sleep_period, 0,
+	       sizeof(pmadapter->saved_sleep_period));
 	pmadapter->tx_lock_flag = MFALSE;
 	pmadapter->null_pkt_interval = 0;
 	pmadapter->fw_bands = 0;
@@ -884,7 +896,8 @@ t_void wlan_init_adapter(pmlan_adapter pmadapter)
 #endif
 #if defined(PCIE9098) || defined(PCIE9097)
 		if (pmadapter->pcard_pcie->reg->use_adma) {
-			pmadapter->pcard_pcie->rxbd_wrptr = MLAN_MAX_TXRX_BD;
+			pmadapter->pcard_pcie->rxbd_wrptr =
+				pmadapter->pcard_pcie->reg->txrx_bd_size;
 			pmadapter->pcard_pcie->evtbd_wrptr = MLAN_MAX_EVT_BD;
 		}
 #endif
@@ -974,6 +987,11 @@ mlan_status wlan_init_priv_lock_list(pmlan_adapter pmadapter, t_u8 start_index)
 			util_init_list_head(
 				(t_void *)pmadapter->pmoal_handle,
 				&priv->sta_list, MTRUE,
+				pmadapter->callbacks.moal_init_lock);
+			/* Initialize tdls_pending_txq */
+			util_init_list_head(
+				(t_void *)pmadapter->pmoal_handle,
+				&priv->tdls_pending_txq, MTRUE,
 				pmadapter->callbacks.moal_init_lock);
 			/* Initialize bypass_txq */
 			util_init_list_head(
@@ -1183,6 +1201,10 @@ t_void wlan_free_lock_list(pmlan_adapter pmadapter)
 				priv->adapter->callbacks.moal_free_lock);
 			util_free_list_head(
 				(t_void *)pmadapter->pmoal_handle,
+				&priv->tdls_pending_txq,
+				pmadapter->callbacks.moal_free_lock);
+			util_free_list_head(
+				(t_void *)pmadapter->pmoal_handle,
 				&priv->bypass_txq,
 				pmadapter->callbacks.moal_free_lock);
 			for (j = 0; j < MAX_NUM_TID; ++j)
@@ -1371,7 +1393,7 @@ done:
  *  @return		MLAN_STATUS_SUCCESS, MLAN_STATUS_PENDING or
  * MLAN_STATUS_FAILURE
  */
-void wlan_update_hw_spec(pmlan_adapter pmadapter)
+static void wlan_update_hw_spec(pmlan_adapter pmadapter)
 {
 	t_u32 i;
 
@@ -1501,7 +1523,7 @@ void wlan_update_hw_spec(pmlan_adapter pmadapter)
  *  @return		MLAN_STATUS_SUCCESS, MLAN_STATUS_PENDING or
  * MLAN_STATUS_FAILURE
  */
-mlan_status wlan_init_priv_fw(pmlan_adapter pmadapter)
+static mlan_status wlan_init_priv_fw(pmlan_adapter pmadapter)
 {
 	mlan_status ret = MLAN_STATUS_SUCCESS;
 	pmlan_private priv = MNULL;
@@ -1757,7 +1779,7 @@ t_void wlan_free_priv(mlan_private *pmpriv)
  *
  *  @return             N/A
  */
-mlan_status wlan_init_interface(pmlan_adapter pmadapter)
+static mlan_status wlan_init_interface(pmlan_adapter pmadapter)
 {
 	mlan_status ret = MLAN_STATUS_SUCCESS;
 	pmlan_callbacks pcb = MNULL;

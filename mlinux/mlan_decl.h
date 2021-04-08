@@ -3,7 +3,7 @@
  *  @brief This file declares the generic data structures and APIs.
  *
  *
- *  Copyright 2014-2020 NXP
+ *  Copyright 2008-2021 NXP
  *
  *  This software file (the File) is distributed by NXP
  *  under the terms of the GNU General Public License Version 2, June 1991
@@ -24,7 +24,7 @@
 #define _MLAN_DECL_H_
 
 /** MLAN release version */
-#define MLAN_RELEASE_VERSION "216"
+#define MLAN_RELEASE_VERSION "234"
 
 /** Re-define generic data types for MLAN/MOAL */
 /** Signed char (1-byte) */
@@ -233,12 +233,12 @@ typedef t_s32 t_sval;
 /** MU beamformer */
 #define DEFALUT_11AC_CAP_BEAMFORMING_RESET_MASK (MBIT(19))
 
-/** Size of rx data buffer 4096+256 */
-#define MLAN_RX_DATA_BUF_SIZE 4352
+/** Size of rx data buffer 3839+256 */
+#define MLAN_RX_DATA_BUF_SIZE 4096
 
 /** Size of command buffer */
 /** because cal_data_size 2.4 k */
-#define MRVDRV_SIZE_OF_CMD_BUFFER (4 * 1024)
+#define MRVDRV_SIZE_OF_CMD_BUFFER (3 * 1024)
 /** Size of rx command buffer */
 #define MLAN_RX_CMD_BUF_SIZE MRVDRV_SIZE_OF_CMD_BUFFER
 /** Upload size */
@@ -365,6 +365,8 @@ typedef t_u8 mlan_802_11_mac_addr[MLAN_MAC_ADDR_LENGTH];
 #define CARD_TYPE_9097 0x07
 /** 8978 card type */
 #define CARD_TYPE_8978 0x08
+/** 9177 card type */
+#define CARD_TYPE_9177 0x09
 
 /** 9098 A0 reverion num */
 #define CHIP_9098_REV_A0 1
@@ -392,6 +394,8 @@ typedef t_u8 mlan_802_11_mac_addr[MLAN_MAC_ADDR_LENGTH];
 #define CARD_TYPE_SD9097 (CARD_TYPE_9097 | (INTF_SD << 8))
 /** SD9098 card type */
 #define CARD_TYPE_SD9098 (CARD_TYPE_9098 | (INTF_SD << 8))
+/** SD9177 card type */
+#define CARD_TYPE_SD9177 (CARD_TYPE_9177 | (INTF_SD << 8))
 
 #define IS_SD8887(ct) (CARD_TYPE_SD8887 == (ct))
 #define IS_SD8897(ct) (CARD_TYPE_SD8897 == (ct))
@@ -401,6 +405,7 @@ typedef t_u8 mlan_802_11_mac_addr[MLAN_MAC_ADDR_LENGTH];
 #define IS_SD8987(ct) (CARD_TYPE_SD8987 == (ct))
 #define IS_SD9097(ct) (CARD_TYPE_SD9097 == (ct))
 #define IS_SD9098(ct) (CARD_TYPE_SD9098 == (ct))
+#define IS_SD9177(ct) (CARD_TYPE_SD9177 == (ct))
 
 /** SD8887 Card */
 #define CARD_SD8887 "SD8887"
@@ -418,6 +423,8 @@ typedef t_u8 mlan_802_11_mac_addr[MLAN_MAC_ADDR_LENGTH];
 #define CARD_SD9097 "SD9097"
 /** SD9098 Card */
 #define CARD_SD9098 "SD9098"
+/** SD9177 Card */
+#define CARD_SD9177 "SD9177"
 #endif
 
 #ifdef PCIE
@@ -484,6 +491,7 @@ typedef t_u8 mlan_802_11_mac_addr[MLAN_MAC_ADDR_LENGTH];
 #define IS_CARD8987(ct) (CARD_TYPE_8987 == ((ct)&0xf))
 #define IS_CARD9098(ct) (CARD_TYPE_9098 == ((ct)&0xf))
 #define IS_CARD9097(ct) (CARD_TYPE_9097 == ((ct)&0xf))
+#define IS_CARD9177(ct) (CARD_TYPE_9177 == ((ct)&0xf))
 
 typedef struct _card_type_entry {
 	t_u16 card_type;
@@ -533,6 +541,9 @@ typedef enum {
 /** Buffer flag for USB TX AGGR */
 #define MLAN_BUF_FLAG_USB_TX_AGGR MBIT(7)
 #endif
+
+/** Buffer flag for TDLS */
+#define MLAN_BUF_FLAG_TDLS MBIT(8)
 
 /** Buffer flag for TCP_ACK */
 #define MLAN_BUF_FLAG_TCP_ACK MBIT(9)
@@ -745,6 +756,7 @@ typedef enum _mlan_event_id {
 	MLAN_EVENT_ID_DRV_BGSCAN_RESULT = 0x80000013,
 	MLAN_EVENT_ID_DRV_FLUSH_RX_WORK = 0x80000015,
 	MLAN_EVENT_ID_DRV_DEFER_RX_WORK = 0x80000016,
+	MLAN_EVENT_ID_DRV_TDLS_TEARDOWN_REQ = 0x80000017,
 	MLAN_EVENT_ID_DRV_FT_RESPONSE = 0x80000018,
 	MLAN_EVENT_ID_DRV_FLUSH_MAIN_WORK = 0x80000019,
 #ifdef UAP_SUPPORT
@@ -1109,7 +1121,10 @@ typedef struct _mlan_buffer {
 	t_u32 out_ts_usec;
 	/** tx_seq_num */
 	t_u32 tx_seq_num;
-
+	/** Time stamp when packet is deque from rx_q(seconds) */
+	t_u32 extra_ts_sec;
+	/** Time stamp when packet is dequed from rx_q(micro seconds) */
+	t_u32 extra_ts_usec;
 	/** Fields below are valid for MLAN module only */
 	/** Pointer to parent mlan_buffer */
 	struct _mlan_buffer *pparent;
@@ -1261,6 +1276,242 @@ typedef MLAN_PACK_START struct _tlvbuf_custom_ie {
 	/** Max mgmt IE TLV */
 	tlvbuf_max_mgmt_ie max_mgmt_ie;
 } MLAN_PACK_END mlan_ds_misc_custom_ie;
+
+/** Max TDLS config data length */
+#define MAX_TDLS_DATA_LEN 1024
+
+/** Action commands for TDLS enable/disable */
+#define WLAN_TDLS_CONFIG 0x00
+/** Action commands for TDLS configuration :Set */
+#define WLAN_TDLS_SET_INFO 0x01
+/** Action commands for TDLS configuration :Discovery Request */
+#define WLAN_TDLS_DISCOVERY_REQ 0x02
+/** Action commands for TDLS configuration :Setup Request */
+#define WLAN_TDLS_SETUP_REQ 0x03
+/** Action commands for TDLS configuration :Tear down Request */
+#define WLAN_TDLS_TEAR_DOWN_REQ 0x04
+/** Action ID for TDLS power mode */
+#define WLAN_TDLS_POWER_MODE 0x05
+/**Action ID for init TDLS Channel Switch*/
+#define WLAN_TDLS_INIT_CHAN_SWITCH 0x06
+/** Action ID for stop TDLS Channel Switch */
+#define WLAN_TDLS_STOP_CHAN_SWITCH 0x07
+/** Action ID for configure CS related parameters */
+#define WLAN_TDLS_CS_PARAMS 0x08
+/** Action ID for Disable CS */
+#define WLAN_TDLS_CS_DISABLE 0x09
+/** Action ID for TDLS link status */
+#define WLAN_TDLS_LINK_STATUS 0x0A
+/** Action ID for Host TDLS config uapsd and CS */
+#define WLAN_HOST_TDLS_CONFIG 0x0D
+/** Action ID for TDLS CS immediate return */
+#define WLAN_TDLS_DEBUG_CS_RET_IM 0xFFF7
+/** Action ID for TDLS Stop RX */
+#define WLAN_TDLS_DEBUG_STOP_RX 0xFFF8
+/** Action ID for TDLS Allow weak security for links establish */
+#define WLAN_TDLS_DEBUG_ALLOW_WEAK_SECURITY 0xFFF9
+/** Action ID for TDLS Ignore key lifetime expiry */
+#define WLAN_TDLS_DEBUG_IGNORE_KEY_EXPIRY 0xFFFA
+/** Action ID for TDLS Higher/Lower mac Test */
+#define WLAN_TDLS_DEBUG_HIGHER_LOWER_MAC 0xFFFB
+/** Action ID for TDLS Prohibited Test */
+#define WLAN_TDLS_DEBUG_SETUP_PROHIBITED 0xFFFC
+/** Action ID for TDLS Existing link Test */
+#define WLAN_TDLS_DEBUG_SETUP_SAME_LINK 0xFFFD
+/** Action ID for TDLS Fail Setup Confirm */
+#define WLAN_TDLS_DEBUG_FAIL_SETUP_CONFIRM 0xFFFE
+/** Action commands for TDLS debug: Wrong BSS Request */
+#define WLAN_TDLS_DEBUG_WRONG_BSS 0xFFFF
+
+/** tdls each link rate information */
+typedef MLAN_PACK_START struct _tdls_link_rate_info {
+	/** Tx Data Rate */
+	t_u8 tx_data_rate;
+	/** Tx Rate HT info*/
+	t_u8 tx_rate_htinfo;
+} MLAN_PACK_END tdls_link_rate_info;
+
+/** tdls each link status */
+typedef MLAN_PACK_START struct _tdls_each_link_status {
+	/** peer mac Address */
+	t_u8 peer_mac[MLAN_MAC_ADDR_LENGTH];
+	/** Link Flags */
+	t_u8 link_flags;
+	/** Traffic Status */
+	t_u8 traffic_status;
+	/** Tx Failure Count */
+	t_u8 tx_fail_count;
+	/** Channel Number */
+	t_u32 active_channel;
+	/** Last Data RSSI in dBm */
+	t_s16 data_rssi_last;
+	/** Last Data NF in dBm */
+	t_s16 data_nf_last;
+	/** AVG DATA RSSI in dBm */
+	t_s16 data_rssi_avg;
+	/** AVG DATA NF in dBm */
+	t_s16 data_nf_avg;
+	union {
+		/** tdls rate info */
+		tdls_link_rate_info rate_info;
+		/** tdls link final rate*/
+		t_u16 final_data_rate;
+	} u;
+	/** Security Method */
+	t_u8 security_method;
+	/** Key Lifetime in milliseconds */
+	t_u32 key_lifetime;
+	/** Key Length */
+	t_u8 key_length;
+	/** actual key */
+	t_u8 key[];
+} MLAN_PACK_END tdls_each_link_status;
+
+/** TDLS configuration data */
+typedef MLAN_PACK_START struct _tdls_all_config {
+	union {
+		/** TDLS state enable disable */
+		MLAN_PACK_START struct _tdls_config {
+			/** enable or disable */
+			t_u16 enable;
+		} MLAN_PACK_END tdls_config;
+		/** Host tdls config */
+		MLAN_PACK_START struct _host_tdls_cfg {
+			/** support uapsd */
+			t_u8 uapsd_support;
+			/** channel_switch */
+			t_u8 cs_support;
+			/** TLV  length */
+			t_u16 tlv_len;
+			/** tdls info */
+			t_u8 tlv_buffer[];
+		} MLAN_PACK_END host_tdls_cfg;
+		/** TDLS set info */
+		MLAN_PACK_START struct _tdls_set_data {
+			/** (tlv + capInfo) length */
+			t_u16 tlv_length;
+			/** Cap Info */
+			t_u16 cap_info;
+			/** TLV buffer */
+			t_u8 tlv_buffer[];
+		} MLAN_PACK_END tdls_set;
+
+		/** TDLS discovery and others having mac argument */
+		MLAN_PACK_START struct _tdls_discovery_data {
+			/** peer mac Address */
+			t_u8 peer_mac_addr[MLAN_MAC_ADDR_LENGTH];
+		} MLAN_PACK_END tdls_discovery, tdls_stop_chan_switch,
+			tdls_link_status_req;
+
+		/** TDLS discovery Response */
+		MLAN_PACK_START struct _tdls_discovery_resp {
+			/** payload length */
+			t_u16 payload_len;
+			/** peer mac Address */
+			t_u8 peer_mac_addr[MLAN_MAC_ADDR_LENGTH];
+			/** RSSI */
+			t_s8 rssi;
+			/** Cap Info */
+			t_u16 cap_info;
+			/** TLV buffer */
+			t_u8 tlv_buffer[];
+		} MLAN_PACK_END tdls_discovery_resp;
+
+		/** TDLS setup request */
+		MLAN_PACK_START struct _tdls_setup_data {
+			/** peer mac Address */
+			t_u8 peer_mac_addr[MLAN_MAC_ADDR_LENGTH];
+			/** timeout value in milliseconds */
+			t_u32 setup_timeout;
+			/** key lifetime in milliseconds */
+			t_u32 key_lifetime;
+		} MLAN_PACK_END tdls_setup;
+
+		/** TDLS tear down info */
+		MLAN_PACK_START struct _tdls_tear_down_data {
+			/** peer mac Address */
+			t_u8 peer_mac_addr[MLAN_MAC_ADDR_LENGTH];
+			/** reason code */
+			t_u16 reason_code;
+		} MLAN_PACK_END tdls_tear_down, tdls_cmd_resp;
+
+		/** TDLS power mode info */
+		MLAN_PACK_START struct _tdls_power_mode_data {
+			/** peer mac Address */
+			t_u8 peer_mac_addr[MLAN_MAC_ADDR_LENGTH];
+			/** Power Mode */
+			t_u16 power_mode;
+		} MLAN_PACK_END tdls_power_mode;
+
+		/** TDLS channel switch info */
+		MLAN_PACK_START struct _tdls_chan_switch {
+			/** peer mac Address */
+			t_u8 peer_mac_addr[MLAN_MAC_ADDR_LENGTH];
+			/** Channel Switch primary channel no */
+			t_u8 primary_channel;
+			/** Channel Switch secondary channel offset */
+			t_u8 secondary_channel_offset;
+			/** Channel Switch Band */
+			t_u8 band;
+			/** Channel Switch time in milliseconds */
+			t_u16 switch_time;
+			/** Channel Switch timeout in milliseconds */
+			t_u16 switch_timeout;
+			/** Channel Regulatory class*/
+			t_u8 regulatory_class;
+			/** peridicity flag*/
+			t_u8 periodicity;
+		} MLAN_PACK_END tdls_chan_switch;
+
+		/** TDLS channel switch paramters */
+		MLAN_PACK_START struct _tdls_cs_params {
+			/** unit time, multiples of 10ms */
+			t_u8 unit_time;
+			/** threshold for other link */
+			t_u8 threshold_otherlink;
+			/** threshold for direct link */
+			t_u8 threshold_directlink;
+		} MLAN_PACK_END tdls_cs_params;
+
+		/** tdls disable channel switch */
+		MLAN_PACK_START struct _tdls_disable_cs {
+			/** Data*/
+			t_u16 data;
+		} MLAN_PACK_END tdls_disable_cs;
+		/** TDLS debug data */
+		MLAN_PACK_START struct _tdls_debug_data {
+			/** debug data */
+			t_u16 debug_data;
+		} MLAN_PACK_END tdls_debug_data;
+
+		/** TDLS link status Response */
+		MLAN_PACK_START struct _tdls_link_status_resp {
+			/** payload length */
+			t_u16 payload_len;
+			/** number of links */
+			t_u8 active_links;
+			/** structure for link status */
+			tdls_each_link_status link_stats[1];
+		} MLAN_PACK_END tdls_link_status_resp;
+
+	} u;
+} MLAN_PACK_END tdls_all_config;
+
+/** TDLS configuration buffer */
+typedef MLAN_PACK_START struct _buf_tdls_config {
+	/** TDLS Action */
+	t_u16 tdls_action;
+	/** TDLS data */
+	t_u8 tdls_data[MAX_TDLS_DATA_LEN];
+} MLAN_PACK_END mlan_ds_misc_tdls_config;
+
+/** Event structure for tear down */
+typedef struct _tdls_tear_down_event {
+	/** Peer mac address */
+	t_u8 peer_mac_addr[MLAN_MAC_ADDR_LENGTH];
+	/** Reason code */
+	t_u16 reason_code;
+} tdls_tear_down_event;
 
 /** channel width */
 typedef enum wifi_channel_width {
@@ -1758,6 +2009,8 @@ typedef struct _mlan_callbacks {
 	t_void (*moal_hist_data_add)(t_void *pmoal_handle, t_u32 bss_index,
 				     t_u16 rx_rate, t_s8 snr, t_s8 nflr,
 				     t_u8 antenna);
+	t_void (*moal_updata_peer_signal)(t_void *pmoal_handle, t_u32 bss_index,
+					  t_u8 *peer_addr, t_s8 snr, t_s8 nflr);
 #if defined(DRV_EMBEDDED_AUTHENTICATOR) || defined(DRV_EMBEDDED_SUPPLICANT)
 	mlan_status (*moal_wait_hostcmd_complete)(t_void *pmoal_handle,
 						  t_u32 bss_index);
@@ -1899,8 +2152,6 @@ typedef struct _mlan_device {
 	/** Tx data endpoint address */
 	t_u8 tx_data_ep;
 #endif
-	/** fw region */
-	t_bool fw_region;
 	/** passive to active scan */
 	t_u8 passive_to_active_scan;
 	/** uap max supported station per chip */
