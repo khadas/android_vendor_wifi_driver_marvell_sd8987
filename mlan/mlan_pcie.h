@@ -4,7 +4,7 @@
  *  driver.
  *
  *
- *  Copyright 2014-2020 NXP
+ *  Copyright 2008-2021 NXP
  *
  *  This software file (the File) is distributed by NXP
  *  under the terms of the GNU General Public License Version 2, June 1991
@@ -152,9 +152,9 @@ Change log:
 /** write pointer start from bit 0 */
 #define ADMA_WPTR_START 0
 /** Tx/Rx Read/Write pointer's mask */
-#define TXRX_RW_PTR_MASK (MLAN_MAX_TXRX_BD - 1)
+#define TXRX_RW_PTR_MASK (ADMA_MAX_TXRX_BD - 1)
 /** Tx/Rx Read/Write pointer's rollover indicate bit */
-#define TXRX_RW_PTR_ROLLOVER_IND MLAN_MAX_TXRX_BD
+#define TXRX_RW_PTR_ROLLOVER_IND ADMA_MAX_TXRX_BD
 /** Start of packet flag */
 #define ADMA_BD_FLAG_SOP MBIT(0)
 /** End of packet flag */
@@ -485,6 +485,7 @@ static const struct _mlan_pcie_card_reg mlan_reg_pcie8897 = {
 	.txrx_rw_ptr_rollover_ind = MBIT(10),
 	.use_adma = MFALSE,
 	.msi_int_wr_clr = MTRUE,
+	.txrx_bd_size = MAX_TXRX_BD,
 };
 
 static const struct _mlan_card_info mlan_card_info_pcie8897 = {
@@ -524,6 +525,7 @@ static const struct _mlan_pcie_card_reg mlan_reg_pcie8997 = {
 	.txrx_rw_ptr_rollover_ind = MBIT(12),
 	.use_adma = MFALSE,
 	.msi_int_wr_clr = MTRUE,
+	.txrx_bd_size = MAX_TXRX_BD,
 };
 
 static const struct _mlan_card_info mlan_card_info_pcie8997 = {
@@ -565,6 +567,7 @@ static const struct _mlan_pcie_card_reg mlan_reg_pcie9098 = {
 	.host_intr_cmd_dnld = PCIE9098_HOST_INTR_CMD_DNLD,
 	.use_adma = MTRUE,
 	.msi_int_wr_clr = MTRUE,
+	.txrx_bd_size = ADMA_MAX_TXRX_BD,
 };
 
 static const struct _mlan_card_info mlan_card_info_pcie9098 = {
@@ -607,8 +610,12 @@ static const struct _mlan_pcie_card_reg mlan_reg_pcie9097_b0 = {
 	.host_intr_cmd_dnld = PCIE9098_HOST_INTR_CMD_DNLD,
 	.use_adma = MTRUE,
 	.msi_int_wr_clr = MTRUE,
+	.txrx_bd_size = ADMA_MAX_TXRX_BD,
 };
 #endif
+
+extern mlan_adapter_operations mlan_pcie_ops;
+
 /* Get pcie device from card type */
 mlan_status wlan_get_pcie_device(pmlan_adapter pmadapter);
 

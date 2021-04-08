@@ -4,7 +4,7 @@
  * driver.
  *
  *
- * Copyright 2014-2020 NXP
+ * Copyright 2008-2021 NXP
  *
  * This software file (the File) is distributed by NXP
  * under the terms of the GNU General Public License Version 2, June 1991
@@ -1002,7 +1002,7 @@ static int woal_uap_dfs_testing(struct net_device *dev, struct ifreq *req)
 		/* Set mib value to MLAN */
 		ioctl_req->action = MLAN_ACT_SET;
 		cfg11h->param.dfs_testing.usr_cac_period_msec =
-			param.usr_cac_period;
+			param.usr_cac_period * 1000;
 		cfg11h->param.dfs_testing.usr_nop_period_sec =
 			param.usr_nop_period;
 		cfg11h->param.dfs_testing.usr_no_chan_change =
@@ -1011,8 +1011,7 @@ static int woal_uap_dfs_testing(struct net_device *dev, struct ifreq *req)
 			param.fixed_new_chan;
 		cfg11h->param.dfs_testing.usr_cac_restart = param.cac_restart;
 		priv->phandle->cac_restart = param.cac_restart;
-		priv->phandle->cac_period_jiffies =
-			param.usr_cac_period * HZ / 1000;
+		priv->phandle->cac_period_jiffies = param.usr_cac_period * HZ;
 		priv->user_cac_period_msec =
 			cfg11h->param.dfs_testing.usr_cac_period_msec;
 	}
@@ -1024,7 +1023,7 @@ static int woal_uap_dfs_testing(struct net_device *dev, struct ifreq *req)
 
 	if (!param.action) { /* GET */
 		param.usr_cac_period =
-			cfg11h->param.dfs_testing.usr_cac_period_msec;
+			cfg11h->param.dfs_testing.usr_cac_period_msec / 1000;
 		param.usr_nop_period =
 			cfg11h->param.dfs_testing.usr_nop_period_sec;
 		param.no_chan_change =
@@ -3204,9 +3203,9 @@ done:
  *
  *  @return         MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
-mlan_status woal_uap_get_bss_param(moal_private *priv,
-				   mlan_uap_bss_param *sys_cfg,
-				   t_u8 wait_option)
+static mlan_status woal_uap_get_bss_param(moal_private *priv,
+					  mlan_uap_bss_param *sys_cfg,
+					  t_u8 wait_option)
 {
 	mlan_ds_bss *info = NULL;
 	mlan_ioctl_req *req = NULL;
@@ -3556,8 +3555,8 @@ done:
  *
  *  @return         0 --success, otherwise fail
  */
-int woal_uap_ap_cfg_parse_data(moal_private *priv, mlan_uap_bss_param *ap_cfg,
-			       char *buf)
+static int woal_uap_ap_cfg_parse_data(moal_private *priv,
+				      mlan_uap_bss_param *ap_cfg, char *buf)
 {
 	int ret = 0, atoi_ret;
 	int set_sec = 0, set_key = 0, set_chan = 0;
@@ -3875,8 +3874,9 @@ done:
  *
  *  @return                 MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
-mlan_status woal_set_get_ap_scan_channels(moal_private *priv, t_u16 action,
-					  mlan_uap_scan_channels *scan_channels)
+static mlan_status
+woal_set_get_ap_scan_channels(moal_private *priv, t_u16 action,
+			      mlan_uap_scan_channels *scan_channels)
 {
 	mlan_status ret = MLAN_STATUS_SUCCESS;
 	mlan_ds_bss *bss = NULL;
@@ -3971,7 +3971,7 @@ done:
  *
  *  @return                 MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
-mlan_status woal_start_acs_scan(moal_private *priv)
+static mlan_status woal_start_acs_scan(moal_private *priv)
 {
 	mlan_status ret = MLAN_STATUS_SUCCESS;
 	mlan_ds_bss *bss = NULL;
@@ -4014,7 +4014,7 @@ done:
  *
  *  @return                 MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
-mlan_status woal_do_acs_check(moal_private *priv)
+static mlan_status woal_do_acs_check(moal_private *priv)
 {
 	mlan_status ret = MLAN_STATUS_SUCCESS;
 	mlan_uap_bss_param *sys_config = NULL;

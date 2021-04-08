@@ -3,7 +3,7 @@
  *  @brief This file contains APIs to MOAL module.
  *
  *
- *  Copyright 2014-2020 NXP
+ *  Copyright 2008-2021 NXP
  *
  *  This software file (the File) is distributed by NXP
  *  under the terms of the GNU General Public License Version 2, June 1991
@@ -56,7 +56,7 @@ Change log:
 			Global Variables
 ********************************************************/
 #ifdef STA_SUPPORT
-mlan_operations mlan_sta_ops = {
+static mlan_operations mlan_sta_ops = {
 	/* init cmd handler */
 	wlan_ops_sta_init_cmd,
 	/* ioctl handler */
@@ -76,7 +76,7 @@ mlan_operations mlan_sta_ops = {
 };
 #endif
 #ifdef UAP_SUPPORT
-mlan_operations mlan_uap_ops = {
+static mlan_operations mlan_uap_ops = {
 	/* init cmd handler */
 	wlan_ops_uap_init_cmd,
 	/* ioctl handler */
@@ -140,7 +140,7 @@ extern mlan_status wlan_get_usb_device(pmlan_adapter pmadapter);
  *  @param pmadapter  A pointer to mlan_adapter structure
  *
  */
-void wlan_process_pending_ioctl(mlan_adapter *pmadapter)
+static void wlan_process_pending_ioctl(mlan_adapter *pmadapter)
 {
 	pmlan_ioctl_req pioctl_buf;
 	mlan_status status = MLAN_STATUS_SUCCESS;
@@ -192,15 +192,6 @@ void wlan_process_pending_ioctl(mlan_adapter *pmadapter)
 /********************************************************
 			Global Functions
 ********************************************************/
-#ifdef USB
-extern mlan_adapter_operations mlan_usb_ops;
-#endif
-#ifdef PCIE
-extern mlan_adapter_operations mlan_pcie_ops;
-#endif
-#ifdef SDIO
-extern mlan_adapter_operations mlan_sdio_ops;
-#endif
 
 /**
  *  @brief This function registers MOAL to MLAN module.
@@ -327,6 +318,7 @@ mlan_status mlan_register(pmlan_device pmdevice, t_void **ppmlan_adapter)
 	MASSERT(pcb->moal_spin_lock);
 	MASSERT(pcb->moal_spin_unlock);
 	MASSERT(pcb->moal_hist_data_add);
+	MASSERT(pcb->moal_updata_peer_signal);
 	/* Save pmoal_handle */
 	pmadapter->pmoal_handle = pmdevice->pmoal_handle;
 
@@ -444,7 +436,6 @@ mlan_status mlan_register(pmlan_device pmdevice, t_void **ppmlan_adapter)
 
 	pmadapter->multiple_dtim = pmdevice->multi_dtim;
 	pmadapter->inact_tmo = pmdevice->inact_tmo;
-	pmadapter->init_para.fw_region = pmdevice->fw_region;
 	pmadapter->hs_wake_interval = pmdevice->hs_wake_interval;
 	if (pmdevice->indication_gpio != 0xff) {
 		pmadapter->ind_gpio = pmdevice->indication_gpio & 0x0f;
@@ -947,6 +938,7 @@ mlan_status mlan_rx_process(t_void *pmlan_adapter, t_u8 *rx_pkts)
 	pmlan_buffer pmbuf;
 	t_u8 limit = 0;
 	t_u8 rx_num = 0;
+	t_u32 in_ts_sec, in_ts_usec;
 
 	ENTER();
 
@@ -1004,10 +996,15 @@ rx_process_start:
 			pmadapter->rx_data_queue.plock);
 
 		// rx_trace 6
-		if (pmadapter->tp_state_on)
+		if (pmadapter->tp_state_on) {
 			pmadapter->callbacks.moal_tp_accounting(
 				pmadapter->pmoal_handle, pmbuf,
 				6 /*RX_DROP_P2*/);
+			pcb->moal_get_system_time(pmadapter->pmoal_handle,
+						  &in_ts_sec, &in_ts_usec);
+			pmbuf->extra_ts_sec = in_ts_sec;
+			pmbuf->extra_ts_usec = in_ts_usec;
+		}
 		if (pmadapter->tp_state_drop_point == 6 /*RX_DROP_P2*/) {
 			pmadapter->ops.data_complete(pmadapter, pmbuf, ret);
 			goto rx_process_start;
@@ -1158,11 +1155,15 @@ process_start:
 				break;
 
 			if (pmadapter->data_sent ||
+			    wlan_is_tdls_link_chan_switching(
+				    pmadapter->tdls_status) ||
 			    (wlan_bypass_tx_list_empty(pmadapter) &&
 			     wlan_wmm_lists_empty(pmadapter)) ||
 			    wlan_11h_radar_detected_tx_blocked(pmadapter)) {
 				if (pmadapter->cmd_sent ||
 				    pmadapter->curr_cmd ||
+				    !wlan_is_send_cmd_allowed(
+					    pmadapter->tdls_status) ||
 				    !wlan_is_cmd_pending(pmadapter)) {
 					break;
 				}
@@ -1219,7 +1220,8 @@ process_start:
 				pmadapter->vdll_ctrl.pending_block_len);
 			pmadapter->vdll_ctrl.pending_block = MNULL;
 		}
-		if (!pmadapter->cmd_sent && !pmadapter->curr_cmd) {
+		if (!pmadapter->cmd_sent && !pmadapter->curr_cmd &&
+		    wlan_is_send_cmd_allowed(pmadapter->tdls_status)) {
 			if (wlan_exec_next_cmd(pmadapter) ==
 			    MLAN_STATUS_FAILURE) {
 				ret = MLAN_STATUS_FAILURE;
@@ -1229,6 +1231,7 @@ process_start:
 
 		if (!pmadapter->data_sent &&
 		    !wlan_11h_radar_detected_tx_blocked(pmadapter) &&
+		    !wlan_is_tdls_link_chan_switching(pmadapter->tdls_status) &&
 		    !wlan_bypass_tx_list_empty(pmadapter)) {
 			PRINTM(MINFO, "mlan_send_pkt(): deq(bybass_txq)\n");
 			wlan_process_bypass_tx(pmadapter);
@@ -1242,7 +1245,8 @@ process_start:
 		}
 
 		if (!pmadapter->data_sent && !wlan_wmm_lists_empty(pmadapter) &&
-		    !wlan_11h_radar_detected_tx_blocked(pmadapter)) {
+		    !wlan_11h_radar_detected_tx_blocked(pmadapter) &&
+		    !wlan_is_tdls_link_chan_switching(pmadapter->tdls_status)) {
 			wlan_wmm_process_tx(pmadapter);
 			if (pmadapter->hs_activated == MTRUE) {
 				pmadapter->is_hs_configured = MFALSE;
@@ -1304,6 +1308,8 @@ mlan_status mlan_send_packet(t_void *pmlan_adapter, pmlan_buffer pmbuf)
 	mlan_adapter *pmadapter = (mlan_adapter *)pmlan_adapter;
 	mlan_private *pmpriv;
 	t_u16 eth_type = 0;
+	t_u8 ra[MLAN_MAC_ADDR_LENGTH];
+	tdlsStatus_e tdls_status;
 
 	ENTER();
 	MASSERT(pmlan_adapter && pmbuf);
@@ -1323,9 +1329,19 @@ mlan_status mlan_send_packet(t_void *pmlan_adapter, pmlan_buffer pmbuf)
 	     ((eth_type == MLAN_ETHER_PKT_TYPE_EAPOL) ||
 	      (eth_type == MLAN_ETHER_PKT_TYPE_ARP) ||
 	      (eth_type == MLAN_ETHER_PKT_TYPE_WAPI))) ||
+	    (eth_type == MLAN_ETHER_PKT_TYPE_TDLS_ACTION) ||
 	    (pmbuf->buf_type == MLAN_BUF_TYPE_RAW_DATA)
 
 	) {
+		if (eth_type == MLAN_ETHER_PKT_TYPE_TDLS_ACTION) {
+			memcpy_ext(pmadapter, ra,
+				   pmbuf->pbuf + pmbuf->data_offset,
+				   MLAN_MAC_ADDR_LENGTH, MLAN_MAC_ADDR_LENGTH);
+			tdls_status = wlan_get_tdls_link_status(pmpriv, ra);
+			if (MTRUE == wlan_is_tdls_link_setup(tdls_status) ||
+			    !pmpriv->media_connected)
+				pmbuf->flags |= MLAN_BUF_FLAG_TDLS;
+		}
 		if (eth_type == MLAN_ETHER_PKT_TYPE_EAPOL) {
 			PRINTM_NETINTF(MMSG, pmpriv);
 			PRINTM(MMSG, "wlan: Send EAPOL pkt to " MACSTR "\n",

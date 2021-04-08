@@ -3,7 +3,7 @@
  * @brief This file contains wireless extension standard ioctl functions
  *
  *
- * Copyright 2014-2020 NXP
+ * Copyright 2010-2021 NXP
  *
  * This software file (the File) is distributed by NXP
  * under the terms of the GNU General Public License Version 2, June 1991
@@ -42,7 +42,7 @@ typedef struct _chan_to_freq_t {
 	t_u8 band;
 } chan_to_freq_t;
 
-const chan_to_freq_t chan_to_freq[] = {
+static const chan_to_freq_t chan_to_freq[] = {
 	{1, 2412, 0},	{2, 2417, 0},	{3, 2422, 0},	{4, 2427, 0},
 	{5, 2432, 0},	{6, 2437, 0},	{7, 2442, 0},	{8, 2447, 0},
 	{9, 2452, 0},	{10, 2457, 0},	{11, 2462, 0},	{12, 2467, 0},
@@ -1170,7 +1170,6 @@ done:
 static int woal_set_auth(struct net_device *dev, struct iw_request_info *info,
 			 union iwreq_data *wrqu, char *extra)
 {
-	int ret = 0;
 	moal_private *priv = (moal_private *)netdev_priv(dev);
 	struct iw_param *vwrq = &wrqu->param;
 	mlan_uap_bss_param *sys_cfg = NULL;
@@ -1325,7 +1324,6 @@ static int woal_set_auth(struct net_device *dev, struct iw_request_info *info,
 							   MOAL_IOCTL_WAIT,
 							   sys_cfg)) {
 		PRINTM(MERROR, "Error setting AP confiruration\n");
-		ret = -EFAULT;
 		goto done;
 	}
 
@@ -1816,14 +1814,14 @@ static const iw_handler woal_private_handler[] = {
 // clang-format off
 /** wlan_handler_def */
 struct iw_handler_def woal_uap_handler_def = {
-	num_standard: ARRAY_SIZE(woal_handler),
-	num_private : ARRAY_SIZE(woal_private_handler),
-	num_private_args : ARRAY_SIZE(woal_uap_priv_args),
-	standard : (iw_handler *)woal_handler,
-	private : (iw_handler *)woal_private_handler,
-	private_args : (struct iw_priv_args *)woal_uap_priv_args,
+	.num_standard = ARRAY_SIZE(woal_handler),
+	.num_private = ARRAY_SIZE(woal_private_handler),
+	.num_private_args = ARRAY_SIZE(woal_uap_priv_args),
+	.standard = (iw_handler *)woal_handler,
+	.private = (iw_handler *)woal_private_handler,
+	.private_args = (struct iw_priv_args *)woal_uap_priv_args,
 #if WIRELESS_EXT > 20
-	get_wireless_stats : woal_get_uap_wireless_stats,
+	.get_wireless_stats = woal_get_uap_wireless_stats,
 #endif
 };
 // clang-format on

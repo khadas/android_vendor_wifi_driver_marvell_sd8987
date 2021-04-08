@@ -3,7 +3,7 @@
  *  @brief This file contains SDIO specific code
  *
  *
- *  Copyright 2014-2020 NXP
+ *  Copyright 2008-2021 NXP
  *
  *  This software file (the File) is distributed by NXP
  *  under the terms of the GNU General Public License Version 2, June 1991
@@ -1007,7 +1007,7 @@ static mlan_status wlan_decode_rx_packet(mlan_adapter *pmadapter,
  *  @param pmadapter A pointer to mlan_adapter structure
  *  @return          MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
-mlan_status wlan_receive_single_packet(mlan_adapter *pmadapter)
+static mlan_status wlan_receive_single_packet(mlan_adapter *pmadapter)
 {
 	mlan_buffer *pmbuf;
 	t_u8 port;
@@ -1050,7 +1050,7 @@ done:
  *  @param pmadapter A pointer to mlan_adapter structure
  *  @return          MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
-mlan_status wlan_receive_mp_aggr_buf(mlan_adapter *pmadapter)
+static mlan_status wlan_receive_mp_aggr_buf(mlan_adapter *pmadapter)
 {
 	mlan_status ret = MLAN_STATUS_SUCCESS;
 	pmlan_callbacks pcb = &pmadapter->callbacks;
@@ -1638,7 +1638,8 @@ tx_curr_single:
  *  @return           MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  *
  */
-mlan_status wlan_sdio_check_winner_status(mlan_adapter *pmadapter, t_u32 *val)
+static mlan_status wlan_sdio_check_winner_status(mlan_adapter *pmadapter,
+						 t_u32 *val)
 {
 	t_u32 winner = 0;
 	pmlan_callbacks pcb;
@@ -1668,7 +1669,8 @@ mlan_status wlan_sdio_check_winner_status(mlan_adapter *pmadapter, t_u32 *val)
  *  @param pollnum    Maximum polling number
  *  @return           MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
-mlan_status wlan_sdio_check_fw_status(mlan_adapter *pmadapter, t_u32 pollnum)
+static mlan_status wlan_sdio_check_fw_status(mlan_adapter *pmadapter,
+					     t_u32 pollnum)
 {
 	mlan_status ret = MLAN_STATUS_SUCCESS;
 	t_u16 firmwarestat = 0;
@@ -1709,7 +1711,7 @@ done:
  *  @param pmadapter A pointer to mlan_adapter structure
  *  @return          MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
-mlan_status wlan_enable_sdio_host_int(pmlan_adapter pmadapter)
+static mlan_status wlan_enable_sdio_host_int(pmlan_adapter pmadapter)
 {
 	mlan_status ret;
 	t_u8 mask = pmadapter->pcard_sd->reg->host_int_enable;
@@ -1728,7 +1730,8 @@ mlan_status wlan_enable_sdio_host_int(pmlan_adapter pmadapter)
  *
  *  @return             MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
-mlan_status wlan_sdio_dnld_fw(pmlan_adapter pmadapter, pmlan_fw_image pmfw)
+static mlan_status wlan_sdio_dnld_fw(pmlan_adapter pmadapter,
+				     pmlan_fw_image pmfw)
 {
 	mlan_status ret = MLAN_STATUS_SUCCESS;
 	t_u32 poll_num = 1;
@@ -1936,13 +1939,13 @@ mlan_status wlan_get_sdio_device(pmlan_adapter pmadapter)
  *  @param pmadapter    A pointer to mlan_adapter structure
  *  @return             MLAN_STATUS_SUCCESS
  */
-mlan_status wlan_sdio_interrupt(t_u16 msg_id, pmlan_adapter pmadapter)
+static mlan_status wlan_sdio_interrupt(t_u16 msg_id, pmlan_adapter pmadapter)
 {
 	pmlan_callbacks pcb = &pmadapter->callbacks;
 	mlan_buffer mbuf;
 	t_u32 sdio_ireg = 0;
 	t_u8 offset = 0;
-	t_u8 max_mp_regs = pmadapter->pcard_sd->reg->max_mp_regs;
+	int max_mp_regs = pmadapter->pcard_sd->reg->max_mp_regs;
 	t_u8 host_int_status_reg =
 		pmadapter->pcard_sd->reg->host_int_status_reg;
 
@@ -2062,7 +2065,7 @@ done:
  *  @param pmadapter A pointer to mlan_adapter structure
  *  @return          MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
-mlan_status wlan_process_sdio_int_status(mlan_adapter *pmadapter)
+static mlan_status wlan_process_sdio_int_status(mlan_adapter *pmadapter)
 {
 	mlan_status ret = MLAN_STATUS_SUCCESS;
 	pmlan_callbacks pcb = &pmadapter->callbacks;
@@ -2387,7 +2390,7 @@ exit:
 	return ret;
 }
 
-#if (defined(SD9098) || defined(SD9097))
+#if defined(SD9098) || defined(SD9097)
 /**
  *  @brief This function sends vdll data to the card.
  *
@@ -2396,7 +2399,8 @@ exit:
  * SDIO header)
  *  @return          MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
-mlan_status wlan_sdio_send_vdll(mlan_adapter *pmadapter, mlan_buffer *pmbuf)
+static mlan_status wlan_sdio_send_vdll(mlan_adapter *pmadapter,
+				       mlan_buffer *pmbuf)
 {
 	mlan_status ret = MLAN_STATUS_SUCCESS;
 	t_u32 buf_block_len;
@@ -2440,14 +2444,14 @@ mlan_status wlan_sdio_send_vdll(mlan_adapter *pmadapter, mlan_buffer *pmbuf)
  *  @param tx_param  A pointer to mlan_tx_param
  *  @return          MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
-mlan_status wlan_sdio_host_to_card_ext(pmlan_private pmpriv, t_u8 type,
-				       mlan_buffer *pmbuf,
-				       mlan_tx_param *tx_param)
+static mlan_status wlan_sdio_host_to_card_ext(pmlan_private pmpriv, t_u8 type,
+					      mlan_buffer *pmbuf,
+					      mlan_tx_param *tx_param)
 {
 	mlan_status ret = MLAN_STATUS_SUCCESS;
 	mlan_adapter *pmadapter = pmpriv->adapter;
 
-#if (defined(SD9098) || defined(SD9097))
+#if defined(SD9098) || defined(SD9097)
 	if (type == MLAN_TYPE_VDLL)
 		return wlan_sdio_send_vdll(pmadapter, pmbuf);
 #endif
@@ -2475,7 +2479,7 @@ void wlan_decode_spa_buffer(mlan_adapter *pmadapter, t_u8 *buf, t_u32 len)
 	t_u8 block_num = 0;
 	t_u16 block_size = 0;
 	t_u8 *data;
-	t_u32 pkt_len, pkt_type = 0;
+	t_u32 pkt_len;
 	mlan_buffer *mbuf_deaggr = MNULL;
 
 	ENTER();
@@ -2500,8 +2504,6 @@ void wlan_decode_spa_buffer(mlan_adapter *pmadapter, t_u8 *buf, t_u32 len)
 		}
 		pkt_len = wlan_le16_to_cpu(
 			*(t_u16 *)(data + OFFSET_OF_SDIO_HEADER));
-		pkt_type = wlan_le16_to_cpu(
-			*(t_u16 *)(data + OFFSET_OF_SDIO_HEADER + 2));
 		if ((pkt_len + OFFSET_OF_SDIO_HEADER) > block_size) {
 			PRINTM(MERROR,
 			       "Error in pkt, pkt_len=%d, block_size=%d\n",
@@ -2740,7 +2742,8 @@ error:
  *
  *  @return			MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
-mlan_status wlan_pm_sdio_wakeup_card(pmlan_adapter pmadapter, t_u8 timeout)
+static mlan_status wlan_pm_sdio_wakeup_card(pmlan_adapter pmadapter,
+					    t_u8 timeout)
 {
 	mlan_status ret = MLAN_STATUS_SUCCESS;
 	t_u32 age_ts_usec;
@@ -2773,7 +2776,7 @@ mlan_status wlan_pm_sdio_wakeup_card(pmlan_adapter pmadapter, t_u8 timeout)
  *
  *  @return			MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
-mlan_status wlan_pm_sdio_reset_card(pmlan_adapter pmadapter)
+static mlan_status wlan_pm_sdio_reset_card(pmlan_adapter pmadapter)
 {
 	mlan_status ret = MLAN_STATUS_SUCCESS;
 	pmlan_callbacks pcb = &pmadapter->callbacks;
@@ -2968,8 +2971,9 @@ done:
  *  @param pmbuf     A pointer to the mlan_buffer
  *  @return          N/A
  */
-mlan_status wlan_sdio_data_evt_complete(pmlan_adapter pmadapter,
-					mlan_buffer *pmbuf, mlan_status status)
+static mlan_status wlan_sdio_data_evt_complete(pmlan_adapter pmadapter,
+					       mlan_buffer *pmbuf,
+					       mlan_status status)
 {
 	ENTER();
 
@@ -2986,8 +2990,8 @@ mlan_status wlan_sdio_data_evt_complete(pmlan_adapter pmadapter,
  *  @param pmbuf     A pointer to the mlan_buffer
  *  @return
  */
-mlan_status wlan_sdio_handle_rx_packet(mlan_adapter *pmadapter,
-				       pmlan_buffer pmbuf)
+static mlan_status wlan_sdio_handle_rx_packet(mlan_adapter *pmadapter,
+					      pmlan_buffer pmbuf)
 {
 	ENTER();
 

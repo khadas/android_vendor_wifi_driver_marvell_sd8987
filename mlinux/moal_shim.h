@@ -4,7 +4,7 @@
  * functions defined in moal module
  *
  *
- * Copyright 2014-2020 NXP
+ * Copyright 2008-2020 NXP
  *
  * This software file (the File) is distributed by NXP
  * under the terms of the GNU General Public License Version 2, June 1991
@@ -107,6 +107,8 @@ t_void moal_assert(t_void *pmoal_handle, t_u32 cond);
 t_void moal_hist_data_add(t_void *pmoal_handle, t_u32 bss_index, t_u16 rx_rate,
 			  t_s8 snr, t_s8 nflr, t_u8 antenna);
 
+t_void moal_updata_peer_signal(t_void *pmoal_handle, t_u32 bss_index,
+			       t_u8 *peer_addr, t_s8 snr, t_s8 nflr);
 t_u64 moal_do_div(t_u64 num, t_u32 base);
 
 mlan_status moal_init_timer(t_void *pmoal_handle, t_void **pptimer,
