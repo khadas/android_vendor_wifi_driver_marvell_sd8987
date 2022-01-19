@@ -115,7 +115,6 @@ CONFIG_USERSPACE_32BIT_OVER_KERNEL_64BIT=n
 #############################################################################
 
 MODEXT = ko
-ccflags-y += -Wno-unknown-warning-option -Wno-typedef-redefinition -Wno-pointer-bool-conversion -Wno-self-assign -Wno-parentheses-equality
 ccflags-y += -I$(PWD)/mlan
 ccflags-y += -DLINUX
 
@@ -128,7 +127,7 @@ CONFIG_IMX_SUPPORT=y
 ifeq ($(CONFIG_IMX_SUPPORT),y)
 ccflags-y += -DIMX_SUPPORT
 endif
-KERNELDIR ?= $(KERNEL_SRC)
+KERNELDIR ?= /usr/src/arm/androidQ_kernel/kernel_imx_5_4_47
 CROSS_COMPILE ?= /usr/local/arm/androidQ_toolchain/aarch64-linux-android-4.9/bin/aarch64-linux-android-
 
 LD += -S
@@ -520,11 +519,19 @@ endif
 
 
 
+# add by amlogic
+ccflags-y += -Wno-unknown-warning-option
+ccflags-y += -Wno-typedef-redefinition
+ccflags-y += -Wno-pointer-bool-conversion
+ccflags-y += -Wno-self-assign
+ccflags-y += -Wno-parentheses-equality
 
+# add by amlogic
+MOD_SUFFIX := $(shell echo $(filter %8987,$(patsubst -D%,%,$(ccflags-y))) | tr A-Z a-z)
 
-
-obj-m := mlan.o
-mlan-objs := $(MLANOBJS)
+# modify by amlogic
+obj-m := mlan_$(MOD_SUFFIX).o
+mlan_$(MOD_SUFFIX)-objs := $(MLANOBJS)
 
 ifeq ($(CONFIG_MUSB),y)
 MOALOBJS += mlinux/moal_usb.o
@@ -535,22 +542,30 @@ endif
 ifeq ($(CONFIG_PCIE),y)
 MOALOBJS += mlinux/moal_pcie.o
 endif
-obj-m += moal.o
-moal-objs := $(MOALOBJS)
+
+# modify by amlogic
+obj-m += moal_$(MOD_SUFFIX).o
+moal_$(MOD_SUFFIX)-objs := $(MOALOBJS)
 
 # Otherwise we were called directly from the command line; invoke the kernel build system.
 else
 
-default:
-	$(MAKE) -C $(KERNELDIR) M=$(M) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules
-	$(CROSS_COMPILE)strip --strip-unneeded ${OUT_DIR}/$(M)/mlan.ko
-	$(CROSS_COMPILE)strip --strip-unneeded ${OUT_DIR}/$(M)/moal.ko
+# add by amlogic
+MOD_SUFFIX := $(shell echo $(filter %8987,$(patsubst -D%,%,$(ccflags-y))) | tr A-Z a-z)
+M ?= $(PWD)
 
+# modify by amlogic
+default:
+	$(MAKE) -C $(KERNELDIR) M=$(M) modules
+	$(CROSS_COMPILE)strip --strip-unneeded ${OUT_DIR}/$(M)/mlan_$(MOD_SUFFIX).ko
+	$(CROSS_COMPILE)strip --strip-unneeded ${OUT_DIR}/$(M)/moal_$(MOD_SUFFIX).ko
+
+# add by amlogic
 modules_install:
 	$(MAKE) INSTALL_MOD_STRIP=1 M=$(M) -C $(KERNELDIR) modules_install
 	mkdir -p ${OUT_DIR}/../vendor_lib/modules
-	cd ${OUT_DIR}/$(M)/; find -name mlan.ko -exec cp {} ${OUT_DIR}/../vendor_lib/modules/mlan.ko \;
-	cd ${OUT_DIR}/$(M)/; find -name moal.ko -exec cp {} ${OUT_DIR}/../vendor_lib/modules/moal.ko \;
+	cd ${OUT_DIR}/$(M)/; find -name mlan_$(MOD_SUFFIX).ko -exec cp {} ${OUT_DIR}/../vendor_lib/modules/mlan_$(MOD_SUFFIX).ko \;
+	cd ${OUT_DIR}/$(M)/; find -name moal_$(MOD_SUFFIX).ko -exec cp {} ${OUT_DIR}/../vendor_lib/modules/moal_$(MOD_SUFFIX).ko \;
 
 endif
 
